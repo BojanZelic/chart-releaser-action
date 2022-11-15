@@ -54,13 +54,9 @@ main() {
     repo_root=$(git rev-parse --show-toplevel)
     pushd "$repo_root" > /dev/null
 
-    echo 'Looking up latest tag...'
-    local latest_tag
-    latest_tag=$(lookup_latest_tag)
-
-    echo "Discovering changed charts since '$latest_tag'..."
+    echo "Discovering changed charts..."
     local changed_charts=()
-    readarray -t changed_charts <<< "$(lookup_changed_charts "$latest_tag")"
+    readarray -t changed_charts <<< "$(lookup_changed_charts)"
 
     if [[ -n "${changed_charts[*]}" ]]; then
         install_chart_releaser
@@ -244,15 +240,15 @@ filter_charts() {
 }
 
 lookup_changed_charts() {
-    local commit="$1"
-
-    local changed_files
-    changed_files=$(git diff --find-renames --name-only "$commit" -- "$charts_dir")
-
-    local depth=$(( $(tr "/" "\n" <<< "$charts_dir" | sed '/^\(\.\)*$/d' | wc -l) + 1 ))
-    local fields="1-${depth}"
-
-    cut -d '/' -f "$fields" <<< "$changed_files" | uniq | filter_charts
+    charts_dir=charts
+    charts=$(find -L "$charts_dir" -name Chart.yaml -type f -exec dirname {} +)
+    for chart_path in $charts; do
+        chart_version=$(helm show chart $chart_path | yq eval '.version' -)
+        chart_tag="$(basename $chart_path)-$chart_version"
+        if [ ! $(git tag -l $chart_tag) ]; then
+            echo $chart_path
+        fi
+    done
 }
 
 package_chart() {

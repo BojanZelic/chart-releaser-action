@@ -61,5 +61,8 @@ runs:
             args+=(--install-only "${{ inputs.install_only }}")
         fi
 
+        # Install yq
+        sudo snap install yq
+
         "$GITHUB_ACTION_PATH/cr.sh" "${args[@]}"
       shell: bash
